@@ -4,3 +4,7 @@ logs
 *.png
 *.cfl
 *.hdr
+testcode.py
+reconstructions_test/
+checkpoint/
+runs/

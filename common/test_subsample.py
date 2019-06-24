@@ -9,8 +9,8 @@ import numpy as np
 import pytest
 import torch
 
-from common.subsample import MaskFunc
-
+# from common.subsample import MaskFunc
+from subsample import MaskFunc
 
 @pytest.mark.parametrize("center_fracs, accelerations, batch_size, dim", [
     ([0.2], [4], 4, 320),
@@ -24,6 +24,7 @@ def test_mask_reuse(center_fracs, accelerations, batch_size, dim):
     mask3 = mask_func(shape, seed=123)
     assert torch.all(mask1 == mask2)
     assert torch.all(mask2 == mask3)
+    assert  mask1.shape == [1, 1, dim, 1]
 
 
 @pytest.mark.parametrize("center_fracs, accelerations, batch_size, dim", [

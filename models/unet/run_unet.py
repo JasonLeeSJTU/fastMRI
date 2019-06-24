@@ -7,6 +7,7 @@ LICENSE file in the root directory of this source tree.
 
 import pathlib
 import sys
+sys.path.append(".")
 from collections import defaultdict
 
 import numpy as np
@@ -19,6 +20,7 @@ from common.utils import save_reconstructions
 from data import transforms
 from data.mri_data import SliceData
 from models.unet.unet_model import UnetModel
+from models.unet.resUNet import ResUNet
 
 
 class DataTransform:
@@ -99,7 +101,8 @@ def create_data_loaders(args):
 def load_model(checkpoint_file):
     checkpoint = torch.load(checkpoint_file)
     args = checkpoint['args']
-    model = UnetModel(1, 1, args.num_chans, args.num_pools, args.drop_prob).to(args.device)
+    # model = UnetModel(1, 1, args.num_chans, args.num_pools, args.drop_prob).to(args.device)
+    model = ResUNet(1, 1, args.num_chans, args.num_pools, args.drop_prob).to(args.device)
     if args.data_parallel:
         model = torch.nn.DataParallel(model)
     model.load_state_dict(checkpoint['model'])
@@ -144,6 +147,7 @@ def create_arg_parser():
                         help='Path to save the reconstructions to')
     parser.add_argument('--batch-size', default=16, type=int, help='Mini-batch size')
     parser.add_argument('--device', type=str, default='cuda', help='Which device to run on')
+    parser.add_argument('--data-parallel', action='store_true', help='If set, using multiple GPUs for data parallelism')
     return parser
 
 

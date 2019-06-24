@@ -4,6 +4,8 @@ Copyright (c) Facebook, Inc. and its affiliates.
 This source code is licensed under the MIT license found in the
 LICENSE file in the root directory of this source tree.
 """
+import sys
+sys.path.append(".")
 
 import logging
 import pathlib
@@ -23,6 +25,7 @@ from common.subsample import MaskFunc
 from data import transforms
 from data.mri_data import SliceData
 from models.unet.unet_model import UnetModel
+from models.unet.resUNet import ResUNet
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -148,6 +151,7 @@ def train_epoch(args, epoch, model, data_loader, optimizer, writer):
         target = target.to(args.device)
 
         output = model(input).squeeze(1)
+
         loss = F.l1_loss(output, target)
         optimizer.zero_grad()
         loss.backward()
@@ -184,7 +188,7 @@ def evaluate(args, epoch, model, data_loader, writer):
             output = output * std + mean
 
             norm = norm.unsqueeze(1).unsqueeze(2).to(args.device)
-            loss = F.mse_loss(output / norm, target / norm, size_average=False)
+            loss = F.mse_loss(output / norm, target / norm, reduction='sum')
             losses.append(loss.item())
         writer.add_scalar('Dev_Loss', np.mean(losses), epoch)
     return np.mean(losses), time.perf_counter() - start
@@ -203,6 +207,7 @@ def visualize(args, epoch, model, data_loader, writer):
             input, target, mean, std, norm = data
             input = input.unsqueeze(1).to(args.device)
             target = target.unsqueeze(1).to(args.device)
+
             output = model(input)
             save_image(target, 'Target')
             save_image(output, 'Reconstruction')
@@ -227,12 +232,14 @@ def save_model(args, exp_dir, epoch, model, optimizer, best_dev_loss, is_new_bes
 
 
 def build_model(args):
-    model = UnetModel(
+    # model = UnetModel(
+    model = ResUNet(
         in_chans=1,
         out_chans=1,
         chans=args.num_chans,
         num_pool_layers=args.num_pools,
-        drop_prob=args.drop_prob
+        drop_prob=args.drop_prob,
+        resblock_num=args.resblock_num
     ).to(args.device)
     return model
 
@@ -251,13 +258,14 @@ def load_model(checkpoint_file):
 
 
 def build_optim(args, params):
-    optimizer = torch.optim.RMSprop(params, args.lr, weight_decay=args.weight_decay)
+    # optimizer = torch.optim.RMSprop(params, args.lr, weight_decay=args.weight_decay)
+    optimizer = torch.optim.Adam(params, args.lr, weight_decay=args.weight_decay)
     return optimizer
 
 
 def main(args):
     args.exp_dir.mkdir(parents=True, exist_ok=True)
-    writer = SummaryWriter(log_dir=args.exp_dir / 'summary')
+    writer = SummaryWriter(logdir=args.exp_dir / 'summary')
 
     if args.resume:
         checkpoint, model, optimizer = load_model(args.checkpoint)
@@ -299,11 +307,12 @@ def create_arg_parser():
     parser.add_argument('--num-pools', type=int, default=4, help='Number of U-Net pooling layers')
     parser.add_argument('--drop-prob', type=float, default=0.0, help='Dropout probability')
     parser.add_argument('--num-chans', type=int, default=32, help='Number of U-Net channels')
+    parser.add_argument('--resblock-num', type=int, default=5, help="Number of ResBlocks")
 
     parser.add_argument('--batch-size', default=16, type=int, help='Mini batch size')
-    parser.add_argument('--num-epochs', type=int, default=50, help='Number of training epochs')
+    parser.add_argument('--num-epochs', type=int, default=20, help='Number of training epochs')
     parser.add_argument('--lr', type=float, default=0.001, help='Learning rate')
-    parser.add_argument('--lr-step-size', type=int, default=40,
+    parser.add_argument('--lr-step-size', type=int, default=20,
                         help='Period of learning rate decay')
     parser.add_argument('--lr-gamma', type=float, default=0.1,
                         help='Multiplicative factor of learning rate decay')
